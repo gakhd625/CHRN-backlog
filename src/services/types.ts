@@ -92,7 +92,40 @@ export interface GitRepo {
   name: string;
   localPath: string;
   isConnected: boolean;
+  defaultBranch?: string;
+  activeBranch?: string;
   createdAt: string;
+}
+
+export interface GitCommit {
+  hash: string;
+  author: string;
+  email: string;
+  date: string;
+  message: string;
+  changedFiles: string[];
+}
+
+export interface GitBranch {
+  name: string;
+  isCurrent: boolean;
+}
+
+export interface IRepositoryProvider {
+  connect(projectId: string, name: string, localPath: string): Promise<GitRepo>;
+  getOverview(projectId: string): Promise<{ repo: GitRepo; branches: GitBranch[]; latestCommits: GitCommit[] } | null>;
+  getBranches(projectId: string): Promise<GitBranch[]>;
+  createBranch(projectId: string, branchName: string): Promise<GitBranch>;
+  switchBranch(projectId: string, branchName: string): Promise<void>;
+  getCommits(projectId: string, branchName?: string): Promise<GitCommit[]>;
+  getFileTree(projectId: string): Promise<string[]>;
+  disconnect(projectId: string): Promise<void>;
+}
+
+export interface IRepositoryRepository {
+  getByProject(projectId: string): Promise<GitRepo | null>;
+  connect(repo: Omit<GitRepo, "id" | "createdAt" | "isConnected">): Promise<GitRepo>;
+  disconnect(projectId: string): Promise<void>;
 }
 
 export interface ProjectMember {
