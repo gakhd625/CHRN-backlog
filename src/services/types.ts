@@ -93,6 +93,17 @@ export interface GitRepo {
   createdAt: string;
 }
 
+export interface ProjectMember {
+  id: string;
+  projectId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userAvatar?: string;
+  role: string;
+  joinedAt: string;
+}
+
 // Repository Interfaces
 export interface IUserRepository {
   getCurrentUser(): Promise<User | null>;
@@ -110,6 +121,14 @@ export interface IProjectRepository {
   create(project: Omit<Project, "id" | "createdAt">): Promise<Project>;
   update(project: Project): Promise<Project>;
   delete(key: string): Promise<void>;
+  
+  getMembers(projectId: string): Promise<ProjectMember[]>;
+  addMember(projectId: string, userId: string, role: string): Promise<ProjectMember>;
+  removeMember(projectId: string, memberId: string): Promise<void>;
+  updateMemberRole(memberId: string, role: string): Promise<ProjectMember>;
+  
+  getActivity(projectId: string): Promise<ActivityLog[]>;
+  addActivity(log: Omit<ActivityLog, "id" | "createdAt">): Promise<ActivityLog>;
 }
 
 export interface IIssueRepository {

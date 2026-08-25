@@ -1,16 +1,22 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { BarChart2, CheckCircle2, AlertCircle, Clock, BookOpen } from "lucide-react";
+import { CheckCircle2, AlertCircle, BookOpen, Clock } from "lucide-react";
 import MainLayout from "@/components/MainLayout";
 import { useApp } from "@/context/AppContext";
 import EmptyState from "@/components/EmptyState";
+import LoadingState from "@/components/LoadingState";
+import { projectRepository, issueRepository, wikiRepository, ActivityLog } from "@/services";
 
 export default function ProjectDashboard() {
   const params = useParams();
   const { activeProject, setActiveProjectKey } = useApp();
   const key = params?.key as string;
+
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [counts, setCounts] = useState({ open: 0, closed: 0, wiki: 0 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (key) {
@@ -18,12 +24,50 @@ export default function ProjectDashboard() {
     }
   }, [key, setActiveProjectKey]);
 
+  useEffect(() => {
+    async function loadDashboardData() {
+      if (!key) return;
+      try {
+        const actList = await projectRepository.getActivity(key);
+        setActivities(actList);
+
+        const issueList = await issueRepository.getByProject(key);
+        const open = issueList.filter((i) => i.status !== "closed").length;
+        const closed = issueList.filter((i) => i.status === "closed").length;
+
+        const wikiList = await wikiRepository.getByProject(key);
+
+        setCounts({
+          open,
+          closed,
+          wiki: wikiList.length,
+        });
+      } catch (err) {
+        console.error("Failed to load dashboard statistics", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (activeProject) {
+      loadDashboardData();
+    }
+  }, [key, activeProject]);
+
   if (!activeProject) {
     return (
       <MainLayout>
         <div style={{ textAlign: "center", padding: "48px" }}>
           <h2>Project not found</h2>
         </div>
+      </MainLayout>
+    );
+  }
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <LoadingState message="Loading dashboard statistics..." />
       </MainLayout>
     );
   }
@@ -72,7 +116,7 @@ export default function ProjectDashboard() {
             </div>
             <div>
               <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Open Issues</span>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2px" }}>0</div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2px" }}>{counts.open}</div>
             </div>
           </div>
 
@@ -93,7 +137,7 @@ export default function ProjectDashboard() {
             </div>
             <div>
               <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Completed</span>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2px" }}>0</div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2px" }}>{counts.closed}</div>
             </div>
           </div>
 
@@ -114,7 +158,7 @@ export default function ProjectDashboard() {
             </div>
             <div>
               <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Wiki Pages</span>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2px" }}>0</div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2px" }}>{counts.wiki}</div>
             </div>
           </div>
         </div>
@@ -127,13 +171,56 @@ export default function ProjectDashboard() {
               border: "1px solid var(--border-color)",
               borderRadius: "12px",
               padding: "24px",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "16px" }}>Project Activity</h2>
-            <EmptyState
-              title="No activity yet"
-              description="Issues, wikis, and uploads will register activity here."
-            />
+            
+            {activities.length === 0 ? (
+              <EmptyState
+                title="No activity yet"
+                description="Issues, wikis, and uploads will register activity here."
+              />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {activities.map((act) => (
+                  <div
+                    key={act.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      fontSize: "0.875rem",
+                      borderBottom: "1px solid var(--border-color)",
+                      paddingBottom: "12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "6px",
+                        borderRadius: "50%",
+                        backgroundColor: "var(--bg-tertiary)",
+                        color: "var(--accent-color)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Clock size={14} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>
+                        <span style={{ fontWeight: 600 }}>{act.userName}</span> {act.details}
+                      </div>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px", display: "inline-block" }}>
+                        {new Date(act.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div
@@ -149,15 +236,47 @@ export default function ProjectDashboard() {
               style={{
                 height: "150px",
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 color: "var(--text-muted)",
                 fontSize: "0.85rem",
                 border: "1px dashed var(--border-color)",
                 borderRadius: "8px",
+                padding: "20px",
+                textAlign: "center",
               }}
             >
-              No data to chart yet
+              {counts.open + counts.closed > 0 ? (
+                <div style={{ width: "100%" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "0.75rem" }}>
+                    <span>Progress</span>
+                    <span>{Math.round((counts.closed / (counts.open + counts.closed)) * 100)}%</span>
+                  </div>
+                  <div style={{ height: "12px", width: "100%", backgroundColor: "var(--bg-tertiary)", borderRadius: "6px", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${(counts.closed / (counts.open + counts.closed)) * 100}%`,
+                        backgroundColor: "var(--status-resolved)",
+                        borderRadius: "6px",
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: "12px", marginTop: "16px", fontSize: "0.75rem", justifyContent: "center" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--status-open)" }} />
+                      Open ({counts.open})
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--status-resolved)" }} />
+                      Closed ({counts.closed})
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                "No data to chart yet"
+              )}
             </div>
           </div>
         </div>
