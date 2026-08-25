@@ -167,3 +167,40 @@ export interface IRepositoryRepository {
   connect(repo: Omit<GitRepo, "id" | "createdAt" | "isConnected">): Promise<GitRepo>;
   disconnect(projectId: string): Promise<void>;
 }
+
+// Workflow & Status Configuration
+export interface StatusConfig {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string;
+  order: number;
+}
+
+export interface SavedFilter {
+  id: string;
+  projectId: string;
+  name: string;
+  filters: {
+    status?: string;
+    priority?: string;
+    assigneeId?: string;
+    label?: string;
+    category?: string;
+    dueDateFrom?: string;
+    dueDateTo?: string;
+  };
+  createdAt: string;
+}
+
+export interface IWorkflowRepository {
+  getStatuses(projectId: string): Promise<StatusConfig[]>;
+  addStatus(status: Omit<StatusConfig, "id">): Promise<StatusConfig>;
+  updateStatus(status: StatusConfig): Promise<StatusConfig>;
+  removeStatus(projectId: string, statusId: string): Promise<void>;
+  reorderStatuses(projectId: string, statusIds: string[]): Promise<StatusConfig[]>;
+
+  getSavedFilters(projectId: string): Promise<SavedFilter[]>;
+  saveFilter(filter: Omit<SavedFilter, "id" | "createdAt">): Promise<SavedFilter>;
+  deleteFilter(filterId: string): Promise<void>;
+}
