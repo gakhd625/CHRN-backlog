@@ -5,6 +5,7 @@ import { LocalStorageWikiRepository } from "./local/LocalStorageWikiRepository";
 import { LocalStorageFileRepository } from "./local/LocalStorageFileRepository";
 import { LocalStorageRepositoryRepository } from "./local/LocalStorageRepositoryRepository";
 import { LocalStorageWorkflowRepository } from "./local/LocalStorageWorkflowRepository";
+import { LocalStorageNotificationRepository } from "./local/LocalStorageNotificationRepository";
 
 export const userRepository = new LocalStorageUserRepository();
 export const projectRepository = new LocalStorageProjectRepository();
@@ -13,6 +14,7 @@ export const wikiRepository = new LocalStorageWikiRepository();
 export const fileRepository = new LocalStorageFileRepository();
 export const repositoryRepository = new LocalStorageRepositoryRepository();
 export const workflowRepository = new LocalStorageWorkflowRepository();
+export const notificationRepository = new LocalStorageNotificationRepository();
 
 export function resetLocalStorageData() {
   if (typeof window === "undefined") return;
@@ -31,7 +33,8 @@ export function resetLocalStorageData() {
     "bl_active_project_key",
     "bl_workflows",
     "bl_saved_filters",
-    "bl_project_members"
+    "bl_project_members",
+    "bl_notifications",
   ];
   
   keys.forEach((key) => {

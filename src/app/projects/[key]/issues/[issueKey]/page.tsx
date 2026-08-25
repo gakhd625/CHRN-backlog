@@ -147,6 +147,24 @@ export default function IssueDetailsPage() {
     }
   };
 
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
+
+  const handleSaveEditComment = async (comm: Comment) => {
+    if (!editingCommentText.trim()) return;
+    try {
+      await issueRepository.updateComment({
+        ...comm,
+        content: editingCommentText.trim(),
+      });
+      setEditingCommentId(null);
+      setEditingCommentText("");
+      await loadIssueData();
+    } catch (err: any) {
+      alert(err.message || "Failed to update comment.");
+    }
+  };
+
   const handleUpdateIssue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !currentUser || !issue) return;
@@ -411,18 +429,65 @@ export default function IssueDetailsPage() {
                             {new Date(comm.createdAt).toLocaleString()}
                           </span>
                           {currentUser?.id === comm.userId && (
-                            <button
-                              onClick={() => handleDeleteComment(comm.id)}
-                              style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingCommentId(comm.id);
+                                  setEditingCommentText(comm.content);
+                                }}
+                                style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "0.75rem" }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteComment(comm.id)}
+                                style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
-                      <p style={{ marginTop: "6px", fontSize: "0.9rem", color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>
-                        {comm.content}
-                      </p>
+
+                      {editingCommentId === comm.id ? (
+                        <div style={{ marginTop: "8px" }}>
+                          <textarea
+                            value={editingCommentText}
+                            onChange={(e) => setEditingCommentText(e.target.value)}
+                            rows={2}
+                            style={{
+                              width: "100%",
+                              padding: "8px",
+                              borderRadius: "6px",
+                              border: "1px solid var(--border-color)",
+                              backgroundColor: "var(--bg-primary)",
+                              color: "var(--text-primary)",
+                              outline: "none",
+                              fontSize: "0.875rem",
+                              resize: "vertical",
+                            }}
+                          />
+                          <div style={{ display: "flex", gap: "8px", marginTop: "6px", justifyContent: "flex-end" }}>
+                            <button
+                              onClick={() => setEditingCommentId(null)}
+                              style={{ padding: "4px 10px", borderRadius: "6px", border: "1px solid var(--border-color)", background: "transparent", color: "var(--text-secondary)", cursor: "pointer", fontSize: "0.75rem" }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSaveEditComment(comm)}
+                              style={{ padding: "4px 10px", borderRadius: "6px", border: "none", backgroundColor: "var(--accent-color)", color: "var(--text-on-accent)", cursor: "pointer", fontSize: "0.75rem", fontWeight: 600 }}
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p style={{ marginTop: "6px", fontSize: "0.9rem", color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>
+                          {comm.content}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}

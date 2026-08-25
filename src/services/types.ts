@@ -141,6 +141,7 @@ export interface IIssueRepository {
   // Comments
   getComments(issueId: string): Promise<Comment[]>;
   addComment(comment: Omit<Comment, "id" | "createdAt">): Promise<Comment>;
+  updateComment(comment: Comment): Promise<Comment>;
   deleteComment(commentId: string): Promise<void>;
 
   // Activity Log
@@ -203,4 +204,23 @@ export interface IWorkflowRepository {
   getSavedFilters(projectId: string): Promise<SavedFilter[]>;
   saveFilter(filter: Omit<SavedFilter, "id" | "createdAt">): Promise<SavedFilter>;
   deleteFilter(filterId: string): Promise<void>;
+}
+
+// Notifications Interface
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  link?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface INotificationRepository {
+  getByUser(userId: string): Promise<Notification[]>;
+  markAsRead(notificationId: string): Promise<void>;
+  markAllAsRead(userId: string): Promise<void>;
+  addNotification(notification: Omit<Notification, "id" | "isRead" | "createdAt">): Promise<Notification>;
+  clearAll(userId: string): Promise<void>;
 }
