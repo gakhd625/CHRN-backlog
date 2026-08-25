@@ -74,14 +74,16 @@ export interface WikiPage {
 export interface FileMetadata {
   id: string;
   projectId: string;
+  folderId?: string | null;
   name: string;
-  path: string;        // Local folder path mockup
-  size: number;        // Bytes
-  mimeType: string;
+  isFolder: boolean;
+  sizeBytes: number;
+  mimeType?: string;
+  dataUrl?: string;
   uploadedBy: string;
   uploadedByName: string;
   createdAt: string;
-  issueId?: string;    // Attached to issue
+  issueId?: string;
 }
 
 export interface GitRepo {
@@ -157,9 +159,18 @@ export interface IWikiRepository {
   delete(id: string): Promise<void>;
 }
 
+export interface IFileStorageProvider {
+  saveFile(file: File): Promise<string>;
+  deleteFile(fileId: string): Promise<void>;
+}
+
 export interface IFileRepository {
-  getByProject(projectId: string): Promise<FileMetadata[]>;
-  upload(file: Omit<FileMetadata, "id" | "createdAt">): Promise<FileMetadata>;
+  getByProject(projectId: string, folderId?: string | null): Promise<FileMetadata[]>;
+  getAllByProject(projectId: string): Promise<FileMetadata[]>;
+  createFolder(projectId: string, name: string, parentFolderId?: string | null, userId?: string, userName?: string): Promise<FileMetadata>;
+  uploadFile(projectId: string, file: File, folderId?: string | null, userId?: string, userName?: string): Promise<FileMetadata>;
+  rename(id: string, newName: string): Promise<FileMetadata>;
+  move(id: string, targetFolderId?: string | null): Promise<FileMetadata>;
   delete(id: string): Promise<void>;
 }
 
