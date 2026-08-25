@@ -4,6 +4,7 @@ export interface User {
   email: string;
   avatar?: string;
   role: string;
+  passwordHash?: string;
 }
 
 export interface Project {
@@ -99,6 +100,8 @@ export interface IUserRepository {
   getAll(): Promise<User[]>;
   create(user: Omit<User, "id">): Promise<User>;
   update(user: User): Promise<User>;
+  register(user: Omit<User, "id" | "passwordHash">, passwordPlain: string): Promise<User>;
+  validateCredentials(email: string, passwordPlain: string): Promise<User | null>;
 }
 
 export interface IProjectRepository {

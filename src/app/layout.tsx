@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppProvider } from "@/context/AppContext";
+import AuthGuard from "@/components/AuthGuard";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -37,7 +38,9 @@ export default function RootLayout({
           color: "var(--text-primary)",
         }}
       >
-        <AppProvider>{children}</AppProvider>
+        <AppProvider>
+          <AuthGuard>{children}</AuthGuard>
+        </AppProvider>
       </body>
     </html>
   );
