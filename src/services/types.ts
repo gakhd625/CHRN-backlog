@@ -153,6 +153,7 @@ export interface IIssueRepository {
 
 export interface IWikiRepository {
   getByProject(projectId: string): Promise<WikiPage[]>;
+  getById(id: string): Promise<WikiPage | null>;
   getByTitle(projectId: string, title: string): Promise<WikiPage | null>;
   create(page: Omit<WikiPage, "id" | "createdAt" | "updatedAt" | "version">): Promise<WikiPage>;
   update(page: WikiPage): Promise<WikiPage>;

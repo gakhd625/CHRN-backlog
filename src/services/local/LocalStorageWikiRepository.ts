@@ -18,6 +18,11 @@ export class LocalStorageWikiRepository implements IWikiRepository {
     return list.filter((w) => w.projectId === projectId);
   }
 
+  async getById(id: string): Promise<WikiPage | null> {
+    const list = this.getStored();
+    return list.find((w) => w.id === id) || null;
+  }
+
   async getByTitle(projectId: string, title: string): Promise<WikiPage | null> {
     const list = this.getStored();
     return (
@@ -62,7 +67,7 @@ export class LocalStorageWikiRepository implements IWikiRepository {
 
     const updatedPage: WikiPage = {
       ...page,
-      version: page.version + 1,
+      version: (list[idx].version || 1) + 1,
       updatedAt: new Date().toISOString(),
     };
 
@@ -72,7 +77,16 @@ export class LocalStorageWikiRepository implements IWikiRepository {
   }
 
   async delete(id: string): Promise<void> {
-    const list = this.getStored();
+    let list = this.getStored();
+    
+    // Clear parentId for any child pages referencing this page
+    list = list.map((w) => {
+      if (w.parentId === id) {
+        return { ...w, parentId: undefined };
+      }
+      return w;
+    });
+
     const filtered = list.filter((w) => w.id !== id);
     this.save(filtered);
   }
