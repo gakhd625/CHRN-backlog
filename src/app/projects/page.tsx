@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Folder, Plus, ListTodo, Users, ArrowRight } from "lucide-react";
+import { Folder, Plus, ArrowRight, MessageSquare, Info } from "lucide-react";
 import MainLayout from "@/components/MainLayout";
 import { useApp, Project } from "@/context/AppContext";
 
-export default function Dashboard() {
+export default function ProjectsPage() {
   const router = useRouter();
   const { projects, addProject, setActiveProjectKey } = useApp();
   const [showModal, setShowModal] = useState(false);
@@ -48,178 +47,166 @@ export default function Dashboard() {
   return (
     <MainLayout>
       <div style={{ maxWidth: "1200px", margin: "0 auto", width: "100%" }} className="animate-fade-in">
-        {/* Welcome Section */}
         <div
           style={{
-            background: "linear-gradient(135deg, var(--accent-color), var(--accent-hover))",
-            color: "var(--text-on-accent)",
-            padding: "32px",
-            borderRadius: "16px",
-            marginBottom: "32px",
-            boxShadow: "var(--shadow-md)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "24px",
           }}
         >
-          <h1 style={{ fontSize: "1.8rem", fontWeight: 700, marginBottom: "8px" }}>
-            Welcome back to ChronoBacklog
-          </h1>
-          <p style={{ opacity: 0.9, fontSize: "0.95rem", maxWidth: "600px" }}>
-            Manage your local-first projects, track tasks, write documentation, and inspect repositories offline.
-          </p>
+          <div>
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 700 }}>Projects</h1>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: "4px" }}>
+              Manage and view all your active projects.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              backgroundColor: "var(--accent-color)",
+              color: "var(--text-on-accent)",
+              border: "none",
+              borderRadius: "8px",
+              padding: "10px 16px",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <Plus size={16} />
+            <span>Create Project</span>
+          </button>
         </div>
 
-        {/* Dashboard Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: "24px",
-          }}
-        >
-          {/* Projects Column */}
+        {projects.length === 0 ? (
           <div
             style={{
               backgroundColor: "var(--bg-secondary)",
+              border: "1px dashed var(--border-hover)",
               borderRadius: "12px",
-              border: "1px solid var(--border-color)",
-              padding: "24px",
-              boxShadow: "var(--shadow-sm)",
-              display: "flex",
-              flexDirection: "column",
+              padding: "48px 24px",
+              textAlign: "center",
+              color: "var(--text-muted)",
             }}
           >
-            <div
+            <Folder size={48} style={{ color: "var(--text-muted)", marginBottom: "16px" }} />
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
+              No projects yet
+            </h3>
+            <p style={{ fontSize: "0.9rem", marginBottom: "24px" }}>
+              Create your first project to start tracking issues, board, wiki, and repository files.
+            </p>
+            <button
+              onClick={() => setShowModal(true)}
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "20px",
+                backgroundColor: "var(--accent-color)",
+                color: "var(--text-on-accent)",
+                border: "none",
+                borderRadius: "8px",
+                padding: "10px 20px",
+                fontWeight: 600,
+                cursor: "pointer",
               }}
             >
-              <h2 style={{ fontSize: "1.1rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
-                <Folder size={18} style={{ color: "var(--accent-color)" }} />
-                <span>My Projects</span>
-              </h2>
-              <button
-                onClick={() => setShowModal(true)}
-                style={{
-                  background: "var(--accent-light)",
-                  color: "var(--accent-color)",
-                  border: "none",
-                  borderRadius: "8px",
-                  padding: "6px 12px",
-                  fontSize: "0.8rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-              >
-                <Plus size={14} />
-                <span>New Project</span>
-              </button>
-            </div>
-
-            {projects.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-muted)" }}>
-                <p style={{ fontSize: "0.9rem", marginBottom: "16px" }}>No projects created yet.</p>
-                <button
-                  onClick={() => setShowModal(true)}
-                  style={{
-                    backgroundColor: "var(--accent-color)",
-                    color: "var(--text-on-accent)",
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "8px 16px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Create Project
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {projects.map((proj) => (
-                  <div
-                    key={proj.id}
-                    onClick={() => handleSelectProject(proj.key)}
-                    style={{
-                      padding: "16px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--border-color)",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = "var(--accent-color)";
-                      e.currentTarget.style.backgroundColor = "var(--bg-tertiary)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = "var(--border-color)";
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: "0.95rem", fontWeight: 600, marginBottom: "4px" }}>
-                        {proj.name}
-                      </h3>
-                      <span
-                        style={{
-                          fontSize: "0.75rem",
-                          backgroundColor: "var(--bg-tertiary)",
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                          fontWeight: 500,
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        {proj.key}
-                      </span>
-                    </div>
-                    <ArrowRight size={16} style={{ color: "var(--text-muted)" }} />
-                  </div>
-                ))}
-              </div>
-            )}
+              Get Started
+            </button>
           </div>
-
-          {/* Quick Stats & Activity */}
+        ) : (
           <div
             style={{
-              backgroundColor: "var(--bg-secondary)",
-              borderRadius: "12px",
-              border: "1px solid var(--border-color)",
-              padding: "24px",
-              boxShadow: "var(--shadow-sm)",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: "20px",
             }}
           >
-            <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "20px" }}>
-              Overview
-            </h2>
+            {projects.map((proj) => (
+              <div
+                key={proj.id}
+                onClick={() => handleSelectProject(proj.key)}
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "12px",
+                  padding: "20px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  minHeight: "160px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--accent-color)";
+                  e.currentTarget.style.boxShadow = "var(--shadow-md)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border-color)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        backgroundColor: "var(--accent-light)",
+                        color: "var(--accent-color)",
+                        padding: "2px 8px",
+                        borderRadius: "6px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {proj.key}
+                    </span>
+                    <Folder size={18} style={{ color: "var(--text-muted)" }} />
+                  </div>
+                  <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "8px" }}>
+                    {proj.name}
+                  </h2>
+                  {proj.description && (
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", lineBreak: "anywhere", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {proj.description}
+                    </p>
+                  )}
+                </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-              <div style={{ padding: "16px", borderRadius: "8px", backgroundColor: "var(--bg-tertiary)" }}>
-                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Total Projects</span>
-                <div style={{ fontSize: "1.8rem", fontWeight: 700, marginTop: "4px" }}>{projects.length}</div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginTop: "16px",
+                    borderTop: "1px solid var(--border-color)",
+                    paddingTop: "12px",
+                    fontSize: "0.8rem",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Info size={12} />
+                    Local-first
+                  </span>
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      color: "var(--accent-color)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Open Project
+                    <ArrowRight size={14} />
+                  </span>
+                </div>
               </div>
-              <div style={{ padding: "16px", borderRadius: "8px", backgroundColor: "var(--bg-tertiary)" }}>
-                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Open Issues</span>
-                <div style={{ fontSize: "1.8rem", fontWeight: 700, marginTop: "4px" }}>0</div>
-              </div>
-            </div>
-
-            <h3 style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: "12px", color: "var(--text-muted)" }}>
-              Recent Activity
-            </h3>
-            <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", padding: "12px 0", textAlign: "center" }}>
-              No recent activity recorded yet. Activity will update as you create issues or projects.
-            </div>
+            ))}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Create Project Modal */}
@@ -264,7 +251,6 @@ export default function Dashboard() {
                 value={projName}
                 onChange={(e) => {
                   setProjName(e.target.value);
-                  // Auto-generate project key
                   if (!projKey) {
                     const words = e.target.value.split(" ");
                     const keyVal = words.map(w => w[0]).join("").substring(0, 5).toUpperCase();
