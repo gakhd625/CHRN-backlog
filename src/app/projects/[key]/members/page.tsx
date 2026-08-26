@@ -6,7 +6,7 @@ import { Users, Plus, Trash2, Edit3, X, UserCheck, Shield } from "lucide-react";
 import MainLayout from "@/components/MainLayout";
 import { useApp } from "@/context/AppContext";
 import LoadingState from "@/components/LoadingState";
-import { projectRepository, userRepository, ProjectMember, User } from "@/services";
+import { projectRepository, userRepository, ProjectMember, User, ProjectRole } from "@/services";
 
 export default function MembersPage() {
   const params = useParams();
@@ -20,7 +20,7 @@ export default function MembersPage() {
 
   // Form State
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [selectedRole, setSelectedRole] = useState("Developer");
+  const [selectedRole, setSelectedRole] = useState<ProjectRole>("Developer");
 
   useEffect(() => {
     if (key) {
@@ -65,7 +65,7 @@ export default function MembersPage() {
     }
   };
 
-  const handleRoleChange = async (memberId: string, role: string) => {
+  const handleRoleChange = async (memberId: string, role: ProjectRole) => {
     try {
       await projectRepository.updateMemberRole(memberId, role);
       await loadMembers();
@@ -214,7 +214,7 @@ export default function MembersPage() {
                         <Shield size={12} style={{ color: "var(--accent-color)" }} />
                         <select
                           value={member.role}
-                          onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                          onChange={(e) => handleRoleChange(member.id, e.target.value as ProjectRole)}
                           style={{
                             border: "none",
                             background: "transparent",
@@ -225,7 +225,7 @@ export default function MembersPage() {
                             outline: "none",
                           }}
                         >
-                          <option value="Administrator">Administrator</option>
+                          <option value="Project Administrator">Project Administrator</option>
                           <option value="Manager">Manager</option>
                           <option value="Developer">Developer</option>
                           <option value="Reporter">Reporter</option>
@@ -351,7 +351,7 @@ export default function MembersPage() {
                   </label>
                   <select
                     value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value)}
+                    onChange={(e) => setSelectedRole(e.target.value as ProjectRole)}
                     style={{
                       width: "100%",
                       padding: "10px",
@@ -363,7 +363,7 @@ export default function MembersPage() {
                       fontSize: "0.9rem",
                     }}
                   >
-                    <option value="Administrator">Administrator</option>
+                    <option value="Project Administrator">Project Administrator</option>
                     <option value="Manager">Manager</option>
                     <option value="Developer">Developer</option>
                     <option value="Reporter">Reporter</option>

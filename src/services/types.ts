@@ -144,6 +144,24 @@ export interface IRepositoryRepository {
   disconnect(projectId: string): Promise<void>;
 }
 
+export type ProjectRole =
+  | "Project Administrator"
+  | "Manager"
+  | "Developer"
+  | "Reporter"
+  | "Viewer";
+
+export type Permission =
+  | "manage_project"
+  | "create_issue"
+  | "edit_issue"
+  | "delete_issue"
+  | "manage_files"
+  | "manage_wiki"
+  | "manage_repo"
+  | "manage_members"
+  | "manage_settings";
+
 export interface ProjectMember {
   id: string;
   projectId: string;
@@ -151,7 +169,7 @@ export interface ProjectMember {
   userName: string;
   userEmail: string;
   userAvatar?: string;
-  role: string;
+  role: ProjectRole;
   joinedAt: string;
 }
 
@@ -174,9 +192,9 @@ export interface IProjectRepository {
   delete(key: string): Promise<void>;
   
   getMembers(projectId: string): Promise<ProjectMember[]>;
-  addMember(projectId: string, userId: string, role: string): Promise<ProjectMember>;
+  addMember(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMember>;
   removeMember(projectId: string, memberId: string): Promise<void>;
-  updateMemberRole(memberId: string, role: string): Promise<ProjectMember>;
+  updateMemberRole(memberId: string, role: ProjectRole): Promise<ProjectMember>;
   
   getActivity(projectId: string): Promise<ActivityLog[]>;
   addActivity(log: Omit<ActivityLog, "id" | "createdAt">): Promise<ActivityLog>;

@@ -1,4 +1,4 @@
-import { Project, ProjectMember, ActivityLog, IProjectRepository, User } from "../types";
+import { Project, ProjectMember, ActivityLog, IProjectRepository, User, ProjectRole } from "../types";
 
 export class LocalStorageProjectRepository implements IProjectRepository {
   private key = "bl_projects";
@@ -86,7 +86,7 @@ export class LocalStorageProjectRepository implements IProjectRepository {
           userName: user.name,
           userEmail: user.email,
           userAvatar: user.avatar,
-          role: "Administrator",
+          role: "Project Administrator",
           joinedAt: new Date().toISOString(),
         };
         members.push(newMember);
@@ -182,7 +182,7 @@ export class LocalStorageProjectRepository implements IProjectRepository {
           userId: defaultUser.id,
           userName: defaultUser.name,
           userEmail: defaultUser.email,
-          role: "Administrator",
+          role: "Project Administrator",
           joinedAt: proj.createdAt || new Date().toISOString(),
         };
         const updatedMembers = [initialMember];
@@ -193,7 +193,7 @@ export class LocalStorageProjectRepository implements IProjectRepository {
     return members.filter((m) => m.projectId === projectId);
   }
 
-  async addMember(projectId: string, userId: string, role: string): Promise<ProjectMember> {
+  async addMember(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMember> {
     const members = this.getStoredMembers();
     
     // Check if user is already a member
@@ -266,7 +266,7 @@ export class LocalStorageProjectRepository implements IProjectRepository {
     }
   }
 
-  async updateMemberRole(memberId: string, role: string): Promise<ProjectMember> {
+  async updateMemberRole(memberId: string, role: ProjectRole): Promise<ProjectMember> {
     const members = this.getStoredMembers();
     const idx = members.findIndex((m) => m.id === memberId);
     if (idx === -1) throw new Error("Project member not found.");

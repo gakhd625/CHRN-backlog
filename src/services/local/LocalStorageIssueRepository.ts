@@ -1,4 +1,5 @@
 import { Issue, Comment, ActivityLog, IIssueRepository } from "../types";
+import { authorizationService } from "../AuthorizationService";
 
 export class LocalStorageIssueRepository implements IIssueRepository {
   private issuesKey = "bl_issues";
@@ -70,6 +71,8 @@ export class LocalStorageIssueRepository implements IIssueRepository {
   }
 
   async create(issue: Omit<Issue, "id" | "key" | "createdAt" | "updatedAt">): Promise<Issue> {
+    await authorizationService.checkPermission(issue.reporterId, issue.projectKey, "create_issue");
+
     const list = this.getStoredIssues();
     
     // Find next issue index number for this project key
@@ -119,6 +122,8 @@ export class LocalStorageIssueRepository implements IIssueRepository {
   }
 
   async update(issue: Issue, userId: string, userName: string): Promise<Issue> {
+    await authorizationService.checkPermission(userId, issue.projectKey, "edit_issue");
+
     const list = this.getStoredIssues();
     const idx = list.findIndex((i) => i.id === issue.id);
     if (idx === -1) throw new Error("Issue not found");
