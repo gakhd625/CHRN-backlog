@@ -5,16 +5,16 @@ import { useParams } from "next/navigation";
 import {
   GitBranch as GitBranchIcon,
   GitCommit as GitCommitIcon,
-  Folder,
+  GitPullRequest as GitPullRequestIcon,
   FileCode,
   Plus,
   Terminal,
   Unplug,
   CheckCircle,
-  GitPullRequest,
-  Clock,
+  GitFork as GithubIcon,
   User,
-  ChevronRight,
+  Clock,
+  ExternalLink,
 } from "lucide-react";
 import MainLayout from "@/components/MainLayout";
 import { useApp } from "@/context/AppContext";
@@ -24,7 +24,10 @@ import {
   GitRepo,
   GitCommit,
   GitBranch,
+  GitPullRequest,
 } from "@/services";
+import { GitHubRepositoryProvider } from "@/services/local/GitHubRepositoryProvider";
+import { LocalGitRepositoryProvider } from "@/services/local/LocalGitRepositoryProvider";
 
 export default function RepoPage() {
   const params = useParams();
@@ -34,13 +37,16 @@ export default function RepoPage() {
   const [repo, setRepo] = useState<GitRepo | null>(null);
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [commits, setCommits] = useState<GitCommit[]>([]);
+  const [pullRequests, setPullRequests] = useState<GitPullRequest[]>([]);
   const [files, setFiles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "commits" | "branches" | "files">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "commits" | "branches" | "pulls" | "files">("overview");
 
-  // Connect Form State
-  const [repoNameInput, setRepoNameInput] = useState("");
-  const [localPathInput, setLocalPathInput] = useState("");
+  // Connection Setup Form State
+  const [providerType, setProviderType] = useState<"local" | "github">("github");
+  const [githubOwnerInput, setGithubOwnerInput] = useState("gakhd625");
+  const [repoNameInput, setRepoNameInput] = useState("CHRN-backlog");
+  const [localPathInput, setLocalPathInput] = useState("c:/Users/gerly/Desktop/Chrono/Projects/backlog-clone");
 
   // Create Branch State
   const [showBranchModal, setShowBranchModal] = useState(false);
@@ -52,17 +58,39 @@ export default function RepoPage() {
     }
   }, [key, setActiveProjectKey]);
 
+  const getProvider = (type?: string): any => {
+    if (type === "github") {
+      return new GitHubRepositoryProvider();
+    }
+    return repositoryProvider;
+  };
+
   const loadRepoData = async () => {
     if (!key) return;
     try {
-      const overview = await repositoryProvider.getOverview(key);
-      if (overview) {
-        setRepo(overview.repo);
-        setBranches(overview.branches);
-        setCommits(overview.latestCommits);
+      // Check stored repo to determine provider
+      const stored = localStorage.getItem("bl_git_repos");
+      const list: GitRepo[] = stored ? JSON.parse(stored) : [];
+      const found = list.find((r) => r.projectId === key && r.isConnected);
 
-        const tree = await repositoryProvider.getFileTree(key);
-        setFiles(tree);
+      if (found) {
+        const provider = getProvider(found.providerType);
+        const overview = await provider.getOverview(key);
+        if (overview) {
+          setRepo(overview.repo);
+          setBranches(overview.branches);
+          setCommits(overview.latestCommits);
+
+          if (provider.getPullRequests) {
+            const prs = await provider.getPullRequests(key);
+            setPullRequests(prs);
+          }
+
+          const tree = await provider.getFileTree(key);
+          setFiles(tree);
+        } else {
+          setRepo(null);
+        }
       } else {
         setRepo(null);
       }
@@ -81,12 +109,18 @@ export default function RepoPage() {
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!localPathInput.trim() || !key) return;
+    if (!repoNameInput.trim() || !key) return;
 
     try {
-      const name = repoNameInput.trim() || `${key.toLowerCase()}-repo`;
-      await repositoryProvider.connect(key, name, localPathInput.trim());
-      alert("Local Git repository connected successfully!");
+      const provider = getProvider(providerType);
+      await provider.connect(
+        key,
+        repoNameInput.trim(),
+        localPathInput.trim(),
+        providerType,
+        githubOwnerInput.trim()
+      );
+      alert(`Repository connected successfully via ${providerType === "github" ? "GitHub REST API" : "Local Provider"}!`);
       await loadRepoData();
     } catch (err: any) {
       alert(err.message || "Failed to connect repository.");
@@ -96,7 +130,8 @@ export default function RepoPage() {
   const handleDisconnect = async () => {
     if (confirm("Are you sure you want to disconnect this Git repository?")) {
       try {
-        await repositoryProvider.disconnect(key);
+        const provider = getProvider(repo?.providerType);
+        await provider.disconnect(key);
         setRepo(null);
         alert("Repository disconnected.");
       } catch (err: any) {
@@ -110,7 +145,8 @@ export default function RepoPage() {
     if (!newBranchInput.trim() || !key) return;
 
     try {
-      await repositoryProvider.createBranch(key, newBranchInput.trim());
+      const provider = getProvider(repo?.providerType);
+      await provider.createBranch(key, newBranchInput.trim());
       setNewBranchInput("");
       setShowBranchModal(false);
       await loadRepoData();
@@ -122,7 +158,8 @@ export default function RepoPage() {
 
   const handleSwitchBranch = async (branchName: string) => {
     try {
-      await repositoryProvider.switchBranch(key, branchName);
+      const provider = getProvider(repo?.providerType);
+      await provider.switchBranch(key, branchName);
       await loadRepoData();
     } catch (err: any) {
       alert(err.message || "Failed to switch branch.");
@@ -162,10 +199,10 @@ export default function RepoPage() {
           <div>
             <h1 style={{ fontSize: "1.5rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
               <GitBranchIcon style={{ color: "var(--accent-color)" }} />
-              <span>Git Repository</span>
+              <span>Repository & Git</span>
             </h1>
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: "4px" }}>
-              Connect and inspect local Git commits, branches, and version history.
+              Connect local repositories or sync with public GitHub repositories via API.
             </p>
           </div>
 
@@ -200,8 +237,8 @@ export default function RepoPage() {
               border: "1px solid var(--border-color)",
               borderRadius: "12px",
               padding: "32px",
-              maxWidth: "540px",
-              margin: "40px auto 0 auto",
+              maxWidth: "560px",
+              margin: "30px auto 0 auto",
               boxShadow: "var(--shadow-md)",
             }}
           >
@@ -216,57 +253,153 @@ export default function RepoPage() {
                   marginBottom: "12px",
                 }}
               >
-                <Terminal size={32} />
+                {providerType === "github" ? <GithubIcon size={32} /> : <Terminal size={32} />}
               </div>
-              <h2 style={{ fontSize: "1.2rem", fontWeight: 700 }}>Connect Local Git Repository</h2>
+              <h2 style={{ fontSize: "1.2rem", fontWeight: 700 }}>Connect Git Repository</h2>
               <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
-                Link a local repository path to view branches, commits, and diff logs.
+                Choose between connecting a GitHub repository or a Local Git folder.
               </p>
             </div>
 
-            <form onSubmit={handleConnect} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px", color: "var(--text-secondary)" }}>
-                  Repository Name
-                </label>
-                <input
-                  type="text"
-                  value={repoNameInput}
-                  onChange={(e) => setRepoNameInput(e.target.value)}
-                  placeholder={`e.g. ${key.toLowerCase()}-repo`}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--border-color)",
-                    backgroundColor: "var(--bg-primary)",
-                    color: "var(--text-primary)",
-                    outline: "none",
-                  }}
-                />
-              </div>
+            {/* Provider Type Toggle */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
+              <button
+                type="button"
+                onClick={() => setProviderType("github")}
+                style={{
+                  padding: "12px",
+                  borderRadius: "8px",
+                  border: providerType === "github" ? "2px solid var(--accent-color)" : "1px solid var(--border-color)",
+                  backgroundColor: providerType === "github" ? "var(--accent-light)" : "var(--bg-primary)",
+                  color: providerType === "github" ? "var(--accent-color)" : "var(--text-secondary)",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
+                <GithubIcon size={18} />
+                <span>GitHub API</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setProviderType("local")}
+                style={{
+                  padding: "12px",
+                  borderRadius: "8px",
+                  border: providerType === "local" ? "2px solid var(--accent-color)" : "1px solid var(--border-color)",
+                  backgroundColor: providerType === "local" ? "var(--accent-light)" : "var(--bg-primary)",
+                  color: providerType === "local" ? "var(--accent-color)" : "var(--text-secondary)",
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
+                <Terminal size={18} />
+                <span>Local Git</span>
+              </button>
+            </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px", color: "var(--text-secondary)" }}>
-                  Local Folder Path *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={localPathInput}
-                  onChange={(e) => setLocalPathInput(e.target.value)}
-                  placeholder="e.g. c:/Users/gerly/Desktop/Chrono/Projects/backlog-clone"
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--border-color)",
-                    backgroundColor: "var(--bg-primary)",
-                    color: "var(--text-primary)",
-                    outline: "none",
-                  }}
-                />
-              </div>
+            <form onSubmit={handleConnect} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {providerType === "github" ? (
+                <>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px", color: "var(--text-secondary)" }}>
+                      GitHub Owner / Username *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={githubOwnerInput}
+                      onChange={(e) => setGithubOwnerInput(e.target.value)}
+                      placeholder="e.g. gakhd625"
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border-color)",
+                        backgroundColor: "var(--bg-primary)",
+                        color: "var(--text-primary)",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px", color: "var(--text-secondary)" }}>
+                      GitHub Repository Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={repoNameInput}
+                      onChange={(e) => setRepoNameInput(e.target.value)}
+                      placeholder="e.g. CHRN-backlog"
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border-color)",
+                        backgroundColor: "var(--bg-primary)",
+                        color: "var(--text-primary)",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px", color: "var(--text-secondary)" }}>
+                      Repository Name
+                    </label>
+                    <input
+                      type="text"
+                      value={repoNameInput}
+                      onChange={(e) => setRepoNameInput(e.target.value)}
+                      placeholder={`e.g. ${key.toLowerCase()}-repo`}
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border-color)",
+                        backgroundColor: "var(--bg-primary)",
+                        color: "var(--text-primary)",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px", color: "var(--text-secondary)" }}>
+                      Local Folder Path *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={localPathInput}
+                      onChange={(e) => setLocalPathInput(e.target.value)}
+                      placeholder="e.g. c:/Users/gerly/Desktop/Chrono/Projects/backlog-clone"
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border-color)",
+                        backgroundColor: "var(--bg-primary)",
+                        color: "var(--text-primary)",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+                </>
+              )}
 
               <button
                 type="submit"
@@ -283,7 +416,7 @@ export default function RepoPage() {
                   marginTop: "8px",
                 }}
               >
-                Connect Repository
+                Connect {providerType === "github" ? "GitHub" : "Local"} Repository
               </button>
             </form>
           </div>
@@ -305,7 +438,14 @@ export default function RepoPage() {
             >
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
-                  <h2 style={{ fontSize: "1.2rem", fontWeight: 700 }}>{repo.name}</h2>
+                  {repo.providerType === "github" ? (
+                    <GithubIcon size={22} style={{ color: "var(--text-primary)" }} />
+                  ) : (
+                    <Terminal size={22} style={{ color: "var(--accent-color)" }} />
+                  )}
+                  <h2 style={{ fontSize: "1.2rem", fontWeight: 700 }}>
+                    {repo.providerType === "github" ? `${repo.githubOwner}/${repo.name}` : repo.name}
+                  </h2>
                   <span
                     style={{
                       fontSize: "0.75rem",
@@ -320,11 +460,11 @@ export default function RepoPage() {
                     }}
                   >
                     <CheckCircle size={12} />
-                    Connected
+                    Connected ({repo.providerType === "github" ? "GitHub API" : "Local"})
                   </span>
                 </div>
                 <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontFamily: "monospace" }}>
-                  {repo.localPath}
+                  {repo.localPath || `https://github.com/${repo.githubOwner}/${repo.name}`}
                 </span>
               </div>
 
@@ -368,6 +508,7 @@ export default function RepoPage() {
                 { id: "overview", label: "Overview" },
                 { id: "commits", label: `Commits (${commits.length})` },
                 { id: "branches", label: `Branches (${branches.length})` },
+                { id: "pulls", label: `Pull Requests (${pullRequests.length})` },
                 { id: "files", label: "Code Files" },
               ].map((tab) => (
                 <button
@@ -401,31 +542,35 @@ export default function RepoPage() {
                     padding: "24px",
                   }}
                 >
-                  <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px" }}>Recent Activity</h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {commits.slice(0, 3).map((c) => (
-                      <div
-                        key={c.hash}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: "12px",
-                          padding: "12px",
-                          backgroundColor: "var(--bg-primary)",
-                          borderRadius: "8px",
-                          border: "1px solid var(--border-color)",
-                        }}
-                      >
-                        <GitCommitIcon size={18} style={{ color: "var(--accent-color)", marginTop: "2px" }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>{c.message}</div>
-                          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>
-                            {c.author} committed on {new Date(c.date).toLocaleString()} • Hash: <code>{c.hash}</code>
+                  <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px" }}>Recent Commits</h3>
+                  {commits.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No commits loaded yet.</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {commits.slice(0, 3).map((c) => (
+                        <div
+                          key={c.hash}
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "12px",
+                            padding: "12px",
+                            backgroundColor: "var(--bg-primary)",
+                            borderRadius: "8px",
+                            border: "1px solid var(--border-color)",
+                          }}
+                        >
+                          <GitCommitIcon size={18} style={{ color: "var(--accent-color)", marginTop: "2px" }} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>{c.message}</div>
+                            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                              {c.author} committed on {new Date(c.date).toLocaleString()} • Hash: <code>{c.hash}</code>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div
@@ -439,16 +584,18 @@ export default function RepoPage() {
                   <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px" }}>Repository Details</h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "0.85rem" }}>
                     <div>
+                      <span style={{ color: "var(--text-muted)", display: "block" }}>Provider</span>
+                      <strong style={{ color: "var(--text-primary)", textTransform: "capitalize" }}>
+                        {repo.providerType || "local"}
+                      </strong>
+                    </div>
+                    <div>
                       <span style={{ color: "var(--text-muted)", display: "block" }}>Default Branch</span>
                       <strong style={{ color: "var(--text-primary)" }}>{repo.defaultBranch || "main"}</strong>
                     </div>
                     <div>
                       <span style={{ color: "var(--text-muted)", display: "block" }}>Total Commits</span>
                       <strong style={{ color: "var(--text-primary)" }}>{commits.length}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: "var(--text-muted)", display: "block" }}>Connected Since</span>
-                      <strong style={{ color: "var(--text-primary)" }}>{new Date(repo.createdAt).toLocaleDateString()}</strong>
                     </div>
                   </div>
                 </div>
@@ -503,31 +650,6 @@ export default function RepoPage() {
                           {new Date(c.date).toLocaleString()}
                         </span>
                       </div>
-
-                      {c.changedFiles.length > 0 && (
-                        <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px dashed var(--border-color)" }}>
-                          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>
-                            Changed files:
-                          </span>
-                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                            {c.changedFiles.map((f, i) => (
-                              <span
-                                key={i}
-                                style={{
-                                  fontSize: "0.7rem",
-                                  backgroundColor: "var(--bg-tertiary)",
-                                  color: "var(--text-secondary)",
-                                  padding: "1px 6px",
-                                  borderRadius: "4px",
-                                  fontFamily: "monospace",
-                                }}
-                              >
-                                {f}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -623,7 +745,88 @@ export default function RepoPage() {
               </div>
             )}
 
-            {/* Tab 4: Code Files */}
+            {/* Tab 4: Pull Requests */}
+            {activeTab === "pulls" && (
+              <div
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "12px",
+                  padding: "24px",
+                }}
+              >
+                <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <GitPullRequestIcon size={18} style={{ color: "var(--accent-color)" }} />
+                  <span>Pull Requests</span>
+                </h3>
+
+                {pullRequests.length === 0 ? (
+                  <div style={{ padding: "20px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                    No open or merged pull requests found for this repository.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {pullRequests.map((pr) => (
+                      <div
+                        key={pr.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "16px",
+                          backgroundColor: "var(--bg-primary)",
+                          border: "1px solid var(--border-color)",
+                          borderRadius: "8px",
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                padding: "2px 8px",
+                                borderRadius: "10px",
+                                color: "#ffffff",
+                                backgroundColor: pr.state === "open" ? "#10b981" : "#8b5cf6",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {pr.state} #{pr.number}
+                            </span>
+                            <h4 style={{ fontSize: "0.95rem", fontWeight: 600 }}>{pr.title}</h4>
+                          </div>
+
+                          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                            By <strong>{pr.author}</strong> • {pr.headBranch} → {pr.baseBranch} • {new Date(pr.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+
+                        <a
+                          href={pr.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            color: "var(--accent-color)",
+                            textDecoration: "none",
+                            fontWeight: 600,
+                            fontSize: "0.85rem",
+                          }}
+                        >
+                          <span>View on GitHub</span>
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab 5: Code Files */}
             {activeTab === "files" && (
               <div
                 style={{
@@ -668,7 +871,7 @@ export default function RepoPage() {
             <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px" }}>Create Branch</h2>
             <div style={{ marginBottom: "20px" }}>
               <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px", color: "var(--text-secondary)" }}>Branch Name *</label>
-              <input type="text" required value={newBranchInput} onChange={(e) => setNewBranchInput(e.target.value)} placeholder="e.g. feature/auth-guard" style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-primary)", color: "var(--text-primary)", outline: "none" }} />
+              <input type="text" required value={newBranchInput} onChange={(e) => setNewBranchInput(e.target.value)} placeholder="e.g. feature/github-api" style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-primary)", color: "var(--text-primary)", outline: "none" }} />
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
               <button type="button" onClick={() => setShowBranchModal(false)} style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "transparent", color: "var(--text-secondary)", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem" }}>Cancel</button>

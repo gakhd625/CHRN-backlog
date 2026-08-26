@@ -92,6 +92,8 @@ export interface GitRepo {
   name: string;
   localPath: string;
   isConnected: boolean;
+  providerType?: "local" | "github";
+  githubOwner?: string;
   defaultBranch?: string;
   activeBranch?: string;
   createdAt: string;
@@ -111,14 +113,28 @@ export interface GitBranch {
   isCurrent: boolean;
 }
 
+export interface GitPullRequest {
+  id: number;
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  author: string;
+  authorAvatar?: string;
+  createdAt: string;
+  url: string;
+  headBranch: string;
+  baseBranch: string;
+}
+
 export interface IRepositoryProvider {
-  connect(projectId: string, name: string, localPath: string): Promise<GitRepo>;
+  connect(projectId: string, name: string, localPath: string, providerType?: "local" | "github", githubOwner?: string): Promise<GitRepo>;
   getOverview(projectId: string): Promise<{ repo: GitRepo; branches: GitBranch[]; latestCommits: GitCommit[] } | null>;
   getBranches(projectId: string): Promise<GitBranch[]>;
   createBranch(projectId: string, branchName: string): Promise<GitBranch>;
   switchBranch(projectId: string, branchName: string): Promise<void>;
   getCommits(projectId: string, branchName?: string): Promise<GitCommit[]>;
   getFileTree(projectId: string): Promise<string[]>;
+  getPullRequests?(projectId: string): Promise<GitPullRequest[]>;
   disconnect(projectId: string): Promise<void>;
 }
 
