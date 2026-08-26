@@ -7,6 +7,7 @@ import { LocalStorageRepositoryRepository } from "./local/LocalStorageRepository
 import { LocalStorageWorkflowRepository } from "./local/LocalStorageWorkflowRepository";
 import { LocalStorageNotificationRepository } from "./local/LocalStorageNotificationRepository";
 import { LocalGitRepositoryProvider } from "./local/LocalGitRepositoryProvider";
+import { LocalStorageSearchService } from "./local/LocalStorageSearchService";
 
 export const userRepository = new LocalStorageUserRepository();
 export const projectRepository = new LocalStorageProjectRepository();
@@ -17,6 +18,7 @@ export const repositoryRepository = new LocalStorageRepositoryRepository();
 export const workflowRepository = new LocalStorageWorkflowRepository();
 export const notificationRepository = new LocalStorageNotificationRepository();
 export const repositoryProvider = new LocalGitRepositoryProvider();
+export const searchService = new LocalStorageSearchService();
 
 export function resetLocalStorageData() {
   if (typeof window === "undefined") return;

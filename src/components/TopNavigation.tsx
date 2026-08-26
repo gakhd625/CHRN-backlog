@@ -3,9 +3,27 @@
 import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, Search, Bell, Layers, CheckCheck, Trash2, X } from "lucide-react";
+import {
+  Menu,
+  Search,
+  Bell,
+  Layers,
+  CheckCheck,
+  Trash2,
+  ListTodo,
+  BookOpen,
+  Folder,
+  MessageSquare,
+  User as UserIcon,
+  X,
+} from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { notificationRepository, Notification } from "@/services";
+import {
+  notificationRepository,
+  searchService,
+  Notification,
+  SearchResult,
+} from "@/services";
 import UserMenu from "./UserMenu";
 import styles from "./TopNavigation.module.css";
 
@@ -17,9 +35,16 @@ export default function TopNavigation({ onToggleSidebar }: TopNavigationProps) {
   const router = useRouter();
   const { activeProject, currentUser } = useApp();
 
+  // Notifications State
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Global Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = async () => {
     if (!currentUser) return;
@@ -33,15 +58,41 @@ export default function TopNavigation({ onToggleSidebar }: TopNavigationProps) {
 
   useEffect(() => {
     loadNotifications();
-    const interval = setInterval(loadNotifications, 4000); // refresh every 4s
+    const interval = setInterval(loadNotifications, 4000);
     return () => clearInterval(interval);
   }, [currentUser]);
 
-  // Close dropdown on outside click
+  // Live Search trigger
+  useEffect(() => {
+    const runSearch = async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        setShowSearchDropdown(false);
+        return;
+      }
+      try {
+        const results = await searchService.search(searchQuery, {
+          projectId: activeProject?.key,
+        });
+        setSearchResults(results);
+        setShowSearchDropdown(true);
+      } catch (err) {
+        console.error("Search failed", err);
+      }
+    };
+
+    const timer = setTimeout(runSearch, 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery, activeProject]);
+
+  // Close popovers on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifDropdown(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSearchDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -65,9 +116,26 @@ export default function TopNavigation({ onToggleSidebar }: TopNavigationProps) {
   const handleNotificationClick = async (notif: Notification) => {
     await notificationRepository.markAsRead(notif.id);
     await loadNotifications();
-    setShowDropdown(false);
+    setShowNotifDropdown(false);
     if (notif.link) {
       router.push(notif.link);
+    }
+  };
+
+  const handleSearchResultClick = (res: SearchResult) => {
+    setShowSearchDropdown(false);
+    setSearchQuery("");
+    router.push(res.link);
+  };
+
+  const getTypeIcon = (type: SearchResult["type"]) => {
+    switch (type) {
+      case "issue": return <ListTodo size={14} style={{ color: "var(--accent-color)" }} />;
+      case "wiki": return <BookOpen size={14} style={{ color: "#10b981" }} />;
+      case "file": return <Folder size={14} style={{ color: "#f59e0b" }} />;
+      case "comment": return <MessageSquare size={14} style={{ color: "#8b5cf6" }} />;
+      case "project": return <Layers size={14} style={{ color: "#ec4899" }} />;
+      default: return <Search size={14} />;
     }
   };
 
@@ -104,19 +172,105 @@ export default function TopNavigation({ onToggleSidebar }: TopNavigationProps) {
       </div>
 
       <div className={styles.rightSection} style={{ position: "relative" }}>
-        <div className={styles.searchBar}>
-          <Search size={16} className={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Search issues, wiki..."
-            className={styles.searchInput}
-          />
+        {/* Live Search Bar */}
+        <div ref={searchRef} style={{ position: "relative" }}>
+          <div className={styles.searchBar}>
+            <Search size={16} className={styles.searchIcon} />
+            <input
+              type="text"
+              placeholder="Search issues, wiki, files..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={styles.searchInput}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(""); setShowSearchDropdown(false); }}
+                style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Search Results Popover */}
+          {showSearchDropdown && (
+            <div
+              className="animate-fade-in"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                left: 0,
+                right: 0,
+                width: "360px",
+                maxHeight: "420px",
+                backgroundColor: "var(--bg-secondary)",
+                border: "1px solid var(--border-color)",
+                borderRadius: "12px",
+                boxShadow: "var(--shadow-lg)",
+                zIndex: 1000,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderBottom: "1px solid var(--border-color)",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  backgroundColor: "var(--bg-tertiary)",
+                }}
+              >
+                Search Results ({searchResults.length})
+              </div>
+
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                {searchResults.length === 0 ? (
+                  <div style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                    No results found for "{searchQuery}".
+                  </div>
+                ) : (
+                  searchResults.map((res) => (
+                    <div
+                      key={`${res.type}-${res.id}`}
+                      onClick={() => handleSearchResultClick(res)}
+                      style={{
+                        padding: "10px 14px",
+                        borderBottom: "1px solid var(--border-color)",
+                        cursor: "pointer",
+                        display: "flex",
+                        gap: "10px",
+                        alignItems: "flex-start",
+                        transition: "background-color 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                    >
+                      <div style={{ marginTop: "3px" }}>{getTypeIcon(res.type)}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {res.title}
+                        </div>
+                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: "2px 0 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {res.snippet}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bell Notifications */}
-        <div ref={dropdownRef} style={{ position: "relative" }}>
+        <div ref={notifRef} style={{ position: "relative" }}>
           <button
-            onClick={() => setShowDropdown(!showDropdown)}
+            onClick={() => setShowNotifDropdown(!showNotifDropdown)}
             className={styles.notificationButton}
             aria-label="Notifications"
             style={{ position: "relative" }}
@@ -147,7 +301,7 @@ export default function TopNavigation({ onToggleSidebar }: TopNavigationProps) {
           </button>
 
           {/* Popover Dropdown */}
-          {showDropdown && (
+          {showNotifDropdown && (
             <div
               className="animate-fade-in"
               style={{

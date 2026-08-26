@@ -285,3 +285,18 @@ export interface INotificationRepository {
   addNotification(notification: Omit<Notification, "id" | "isRead" | "createdAt">): Promise<Notification>;
   clearAll(userId: string): Promise<void>;
 }
+
+// Global Search Interface
+export interface SearchResult {
+  id: string;
+  type: "issue" | "comment" | "wiki" | "file" | "project" | "user";
+  title: string;
+  snippet: string;
+  link: string;
+  projectKey?: string;
+  updatedAt?: string;
+}
+
+export interface ISearchService {
+  search(query: string, filters?: { projectId?: string; type?: string }): Promise<SearchResult[]>;
+}
