@@ -2,20 +2,39 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, AlertCircle, BookOpen, Clock } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  TrendingUp,
+  AlertTriangle,
+  GitCommit as GitCommitIcon,
+  User as UserIcon,
+  ListTodo,
+} from "lucide-react";
 import MainLayout from "@/components/MainLayout";
 import { useApp } from "@/context/AppContext";
-import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
-import { projectRepository, issueRepository, wikiRepository, ActivityLog } from "@/services";
+import EmptyState from "@/components/EmptyState";
+import {
+  projectRepository,
+  issueRepository,
+  repositoryProvider,
+  Issue,
+  ProjectMember,
+  ActivityLog,
+  GitCommit,
+} from "@/services";
 
 export default function ProjectDashboard() {
   const params = useParams();
   const { activeProject, setActiveProjectKey } = useApp();
   const key = params?.key as string;
 
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
-  const [counts, setCounts] = useState({ open: 0, closed: 0, wiki: 0 });
+  const [recentCommits, setRecentCommits] = useState<GitCommit[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,22 +47,21 @@ export default function ProjectDashboard() {
     async function loadDashboardData() {
       if (!key) return;
       try {
-        const actList = await projectRepository.getActivity(key);
+        const [issueList, memberList, actList, overview] = await Promise.all([
+          issueRepository.getByProject(key),
+          projectRepository.getMembers(key),
+          projectRepository.getActivity(key),
+          repositoryProvider.getOverview(key),
+        ]);
+
+        setIssues(issueList);
+        setMembers(memberList);
         setActivities(actList);
-
-        const issueList = await issueRepository.getByProject(key);
-        const open = issueList.filter((i) => i.status !== "closed").length;
-        const closed = issueList.filter((i) => i.status === "closed").length;
-
-        const wikiList = await wikiRepository.getByProject(key);
-
-        setCounts({
-          open,
-          closed,
-          wiki: wikiList.length,
-        });
+        if (overview) {
+          setRecentCommits(overview.latestCommits);
+        }
       } catch (err) {
-        console.error("Failed to load dashboard statistics", err);
+        console.error("Failed to load dashboard data", err);
       } finally {
         setLoading(false);
       }
@@ -67,10 +85,30 @@ export default function ProjectDashboard() {
   if (loading) {
     return (
       <MainLayout>
-        <LoadingState message="Loading dashboard statistics..." />
+        <LoadingState message="Loading project dashboard & metrics..." />
       </MainLayout>
     );
   }
+
+  // Calculate Metrics from Persisted Data
+  const totalCount = issues.length;
+  const openCount = issues.filter((i) => i.status === "open").length;
+  const progressCount = issues.filter((i) => i.status === "progress").length;
+  const resolvedCount = issues.filter((i) => i.status === "resolved").length;
+  const closedCount = issues.filter((i) => i.status === "closed").length;
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const overdueCount = issues.filter(
+    (i) => i.dueDate && i.dueDate < todayStr && i.status !== "closed"
+  ).length;
+
+  const progressPercent =
+    totalCount > 0 ? Math.round(((resolvedCount + closedCount) / totalCount) * 100) : 0;
+
+  // Priorities
+  const highPriority = issues.filter((i) => i.priority === "high").length;
+  const mediumPriority = issues.filter((i) => i.priority === "medium").length;
+  const lowPriority = issues.filter((i) => i.priority === "low").length;
 
   return (
     <MainLayout>
@@ -97,9 +135,9 @@ export default function ProjectDashboard() {
           )}
         </div>
 
-        {/* Dashboard Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", marginBottom: "32px" }}>
-          {/* Card 1: Open Issues */}
+        {/* 4 Stat Cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "24px" }}>
+          {/* Card 1: Open & Progress */}
           <div
             style={{
               backgroundColor: "var(--bg-secondary)",
@@ -112,15 +150,15 @@ export default function ProjectDashboard() {
             }}
           >
             <div style={{ padding: "12px", borderRadius: "10px", backgroundColor: "#eff6ff", color: "#3b82f6" }}>
-              <AlertCircle size={24} />
+              <AlertCircle size={22} />
             </div>
             <div>
-              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Open Issues</span>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2px" }}>{counts.open}</div>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Active Issues</span>
+              <div style={{ fontSize: "1.4rem", fontWeight: 700, marginTop: "2px" }}>{openCount + progressCount}</div>
             </div>
           </div>
 
-          {/* Card 2: Completed Issues */}
+          {/* Card 2: Completed */}
           <div
             style={{
               backgroundColor: "var(--bg-secondary)",
@@ -133,15 +171,38 @@ export default function ProjectDashboard() {
             }}
           >
             <div style={{ padding: "12px", borderRadius: "10px", backgroundColor: "#ecfdf5", color: "#10b981" }}>
-              <CheckCircle2 size={24} />
+              <CheckCircle2 size={22} />
             </div>
             <div>
-              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Completed</span>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2px" }}>{counts.closed}</div>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Resolved / Closed</span>
+              <div style={{ fontSize: "1.4rem", fontWeight: 700, marginTop: "2px" }}>{resolvedCount + closedCount}</div>
             </div>
           </div>
 
-          {/* Card 3: Wiki Pages */}
+          {/* Card 3: Overdue Issues */}
+          <div
+            style={{
+              backgroundColor: "var(--bg-secondary)",
+              border: overdueCount > 0 ? "1px solid #fca5a5" : "1px solid var(--border-color)",
+              borderRadius: "12px",
+              padding: "20px",
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+            }}
+          >
+            <div style={{ padding: "12px", borderRadius: "10px", backgroundColor: overdueCount > 0 ? "#fee2e2" : "var(--bg-tertiary)", color: overdueCount > 0 ? "var(--priority-high)" : "var(--text-muted)" }}>
+              <AlertTriangle size={22} />
+            </div>
+            <div>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Overdue Issues</span>
+              <div style={{ fontSize: "1.4rem", fontWeight: 700, marginTop: "2px", color: overdueCount > 0 ? "var(--priority-high)" : "var(--text-primary)" }}>
+                {overdueCount}
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Overall Progress % */}
           <div
             style={{
               backgroundColor: "var(--bg-secondary)",
@@ -153,18 +214,90 @@ export default function ProjectDashboard() {
               gap: "16px",
             }}
           >
-            <div style={{ padding: "12px", borderRadius: "10px", backgroundColor: "#fef3c7", color: "#f59e0b" }}>
-              <BookOpen size={24} />
+            <div style={{ padding: "12px", borderRadius: "10px", backgroundColor: "var(--accent-light)", color: "var(--accent-color)" }}>
+              <TrendingUp size={22} />
             </div>
             <div>
-              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Wiki Pages</span>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: "2px" }}>{counts.wiki}</div>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>Overall Completion</span>
+              <div style={{ fontSize: "1.4rem", fontWeight: 700, marginTop: "2px" }}>{progressPercent}%</div>
             </div>
           </div>
         </div>
 
-        {/* Section: Activity & Progress */}
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px" }}>
+        {/* Visual Charts: Status & Priority Progress Bars */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
+          {/* Status Breakdown Bar */}
+          <div
+            style={{
+              backgroundColor: "var(--bg-secondary)",
+              border: "1px solid var(--border-color)",
+              borderRadius: "12px",
+              padding: "20px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <h3 style={{ fontSize: "0.95rem", fontWeight: 700 }}>Status Distribution</h3>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>{totalCount} Total</span>
+            </div>
+
+            {totalCount > 0 ? (
+              <div>
+                <div style={{ height: "12px", width: "100%", backgroundColor: "var(--bg-tertiary)", borderRadius: "6px", overflow: "hidden", display: "flex", marginBottom: "12px" }}>
+                  {openCount > 0 && <div title={`Open: ${openCount}`} style={{ width: `${(openCount / totalCount) * 100}%`, backgroundColor: "#3b82f6" }} />}
+                  {progressCount > 0 && <div title={`In Progress: ${progressCount}`} style={{ width: `${(progressCount / totalCount) * 100}%`, backgroundColor: "#f59e0b" }} />}
+                  {resolvedCount > 0 && <div title={`Resolved: ${resolvedCount}`} style={{ width: `${(resolvedCount / totalCount) * 100}%`, backgroundColor: "#10b981" }} />}
+                  {closedCount > 0 && <div title={`Closed: ${closedCount}`} style={{ width: `${(closedCount / totalCount) * 100}%`, backgroundColor: "#6b7280" }} />}
+                </div>
+
+                <div style={{ display: "flex", gap: "12px", fontSize: "0.75rem", flexWrap: "wrap" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#3b82f6" }} /> Open ({openCount})</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" }} /> Progress ({progressCount})</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#10b981" }} /> Resolved ({resolvedCount})</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#6b7280" }} /> Closed ({closedCount})</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", padding: "12px 0" }}>No issues created yet.</div>
+            )}
+          </div>
+
+          {/* Priority Breakdown Bar */}
+          <div
+            style={{
+              backgroundColor: "var(--bg-secondary)",
+              border: "1px solid var(--border-color)",
+              borderRadius: "12px",
+              padding: "20px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <h3 style={{ fontSize: "0.95rem", fontWeight: 700 }}>Priority Distribution</h3>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>{totalCount} Total</span>
+            </div>
+
+            {totalCount > 0 ? (
+              <div>
+                <div style={{ height: "12px", width: "100%", backgroundColor: "var(--bg-tertiary)", borderRadius: "6px", overflow: "hidden", display: "flex", marginBottom: "12px" }}>
+                  {highPriority > 0 && <div title={`High: ${highPriority}`} style={{ width: `${(highPriority / totalCount) * 100}%`, backgroundColor: "var(--priority-high)" }} />}
+                  {mediumPriority > 0 && <div title={`Medium: ${mediumPriority}`} style={{ width: `${(mediumPriority / totalCount) * 100}%`, backgroundColor: "var(--priority-medium)" }} />}
+                  {lowPriority > 0 && <div title={`Low: ${lowPriority}`} style={{ width: `${(lowPriority / totalCount) * 100}%`, backgroundColor: "var(--priority-low)" }} />}
+                </div>
+
+                <div style={{ display: "flex", gap: "12px", fontSize: "0.75rem", flexWrap: "wrap" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--priority-high)" }} /> High ({highPriority})</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--priority-medium)" }} /> Medium ({mediumPriority})</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--priority-low)" }} /> Low ({lowPriority})</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", padding: "12px 0" }}>No issues created yet.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Section: Split Activity Stream & Recent Git Commits */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+          {/* Recent Activity */}
           <div
             style={{
               backgroundColor: "var(--bg-secondary)",
@@ -175,45 +308,46 @@ export default function ProjectDashboard() {
               flexDirection: "column",
             }}
           >
-            <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "16px" }}>Project Activity</h2>
+            <h2 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "16px" }}>Recent Activity</h2>
             
             {activities.length === 0 ? (
-              <EmptyState
-                title="No activity yet"
-                description="Issues, wikis, and uploads will register activity here."
-              />
+              <EmptyState title="No activity yet" description="Issues, comments, and project changes will show up here." />
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {activities.map((act) => (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {activities.slice(0, 5).map((act) => (
                   <div
                     key={act.id}
                     style={{
                       display: "flex",
                       alignItems: "flex-start",
-                      gap: "12px",
-                      fontSize: "0.875rem",
+                      gap: "10px",
+                      fontSize: "0.85rem",
                       borderBottom: "1px solid var(--border-color)",
-                      paddingBottom: "12px",
+                      paddingBottom: "10px",
                     }}
                   >
                     <div
                       style={{
-                        padding: "6px",
+                        width: "24px",
+                        height: "24px",
                         borderRadius: "50%",
-                        backgroundColor: "var(--bg-tertiary)",
-                        color: "var(--accent-color)",
+                        backgroundColor: "var(--accent-color)",
+                        color: "#ffffff",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        fontSize: "0.65rem",
+                        fontWeight: 600,
+                        flexShrink: 0,
                       }}
                     >
-                      <Clock size={14} />
+                      {act.userName.substring(0, 2).toUpperCase()}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>
-                        <span style={{ fontWeight: 600 }}>{act.userName}</span> {act.details}
+                      <div style={{ color: "var(--text-primary)" }}>
+                        <strong>{act.userName}</strong> {act.details}
                       </div>
-                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px", display: "inline-block" }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px", display: "inline-block" }}>
                         {new Date(act.createdAt).toLocaleString()}
                       </span>
                     </div>
@@ -223,6 +357,7 @@ export default function ProjectDashboard() {
             )}
           </div>
 
+          {/* Recent Git Commits */}
           <div
             style={{
               backgroundColor: "var(--bg-secondary)",
@@ -231,53 +366,41 @@ export default function ProjectDashboard() {
               padding: "24px",
             }}
           >
-            <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "16px" }}>Progress Chart</h2>
-            <div
-              style={{
-                height: "150px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--text-muted)",
-                fontSize: "0.85rem",
-                border: "1px dashed var(--border-color)",
-                borderRadius: "8px",
-                padding: "20px",
-                textAlign: "center",
-              }}
-            >
-              {counts.open + counts.closed > 0 ? (
-                <div style={{ width: "100%" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "0.75rem" }}>
-                    <span>Progress</span>
-                    <span>{Math.round((counts.closed / (counts.open + counts.closed)) * 100)}%</span>
-                  </div>
-                  <div style={{ height: "12px", width: "100%", backgroundColor: "var(--bg-tertiary)", borderRadius: "6px", overflow: "hidden" }}>
-                    <div
-                      style={{
-                        height: "100%",
-                        width: `${(counts.closed / (counts.open + counts.closed)) * 100}%`,
-                        backgroundColor: "var(--status-resolved)",
-                        borderRadius: "6px",
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: "flex", gap: "12px", marginTop: "16px", fontSize: "0.75rem", justifyContent: "center" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--status-open)" }} />
-                      Open ({counts.open})
-                    </span>
-                    <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--status-resolved)" }} />
-                      Closed ({counts.closed})
+            <h2 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <GitCommitIcon size={18} style={{ color: "var(--accent-color)" }} />
+              <span>Recent Git Commits</span>
+            </h2>
+
+            {recentCommits.length === 0 ? (
+              <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", padding: "20px 0", textAlign: "center" }}>
+                No connected Git repository. Connect local Git or GitHub in Repository tab.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {recentCommits.slice(0, 4).map((c) => (
+                  <div
+                    key={c.hash}
+                    style={{
+                      padding: "10px 12px",
+                      backgroundColor: "var(--bg-primary)",
+                      border: "1px solid var(--border-color)",
+                      borderRadius: "8px",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
+                      <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{c.message}</span>
+                      <code style={{ fontSize: "0.75rem", color: "var(--accent-color)", backgroundColor: "var(--bg-tertiary)", padding: "1px 6px", borderRadius: "4px" }}>
+                        {c.hash}
+                      </code>
+                    </div>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      {c.author} • {new Date(c.date).toLocaleDateString()}
                     </span>
                   </div>
-                </div>
-              ) : (
-                "No data to chart yet"
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
